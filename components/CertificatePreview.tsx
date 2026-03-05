@@ -14,19 +14,7 @@ const CertificatePreview: React.FC<Props> = ({ certificate, onClose, onUpdate })
   const qrRef = useRef<HTMLDivElement>(null);
   const printRef = useRef<HTMLDivElement>(null);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [libsLoaded, setLibsLoaded] = useState(false);
   const { data, id, securityCode, pdfUrl } = certificate;
-
-  useEffect(() => {
-    const checkLibs = () => {
-      if ((window as any).jspdf && (window as any).html2canvas) {
-        setLibsLoaded(true);
-      } else {
-        setTimeout(checkLibs, 500);
-      }
-    };
-    checkLibs();
-  }, []);
 
   useEffect(() => {
     // 1. Generate QR Code
@@ -54,12 +42,7 @@ const CertificatePreview: React.FC<Props> = ({ certificate, onClose, onUpdate })
     };
 
     generateQR();
-
-    // 2. Automated Cloud Storage Sync
-    if (isCloudEnabled() && !pdfUrl) {
-      syncToDatabase();
-    }
-  }, [id, pdfUrl]);
+  }, [id]);
 
   const syncToDatabase = async () => {
     if (isSyncing) return;
@@ -87,7 +70,7 @@ const CertificatePreview: React.FC<Props> = ({ certificate, onClose, onUpdate })
     }
     
     try {
-      // 0. Check if libraries are available
+      // Check if libraries are available
       const jspdfLib = (window as any).jspdf;
       const html2canvasLib = (window as any).html2canvas;
 
@@ -95,20 +78,6 @@ const CertificatePreview: React.FC<Props> = ({ certificate, onClose, onUpdate })
         console.error("PDF libraries (jsPDF or html2canvas) not loaded yet");
         return null;
       }
-
-      // 1. Ensure all images are loaded before capturing
-      const images = printRef.current.querySelectorAll('img');
-      const imagePromises = Array.from(images).map((img: HTMLImageElement) => {
-        if (img.complete) return Promise.resolve();
-        return new Promise(resolve => {
-          img.onload = resolve;
-          img.onerror = resolve;
-        });
-      });
-      await Promise.all(imagePromises);
-
-      // 2. Wait a moment for any final rendering (like QR code)
-      await new Promise(resolve => setTimeout(resolve, 300));
 
       const { jsPDF } = jspdfLib;
       const jsPDFConstructor = jsPDF || jspdfLib;
@@ -227,20 +196,10 @@ const CertificatePreview: React.FC<Props> = ({ certificate, onClose, onUpdate })
       <div className="flex flex-wrap justify-center gap-2 sm:gap-4 mb-8 sticky top-4 z-50 px-4">
         <button 
           onClick={handleDownload}
-          disabled={!libsLoaded}
-          className={`${!libsLoaded ? 'bg-slate-400 cursor-not-allowed' : 'bg-[#0035AD] hover:bg-blue-800'} text-white px-4 sm:px-8 py-2.5 sm:py-3 rounded-full font-black uppercase tracking-widest shadow-2xl transition flex items-center gap-2 text-[10px] sm:text-xs`}
+          className="bg-[#0035AD] hover:bg-blue-800 text-white px-4 sm:px-8 py-2.5 sm:py-3 rounded-full font-black uppercase tracking-widest shadow-2xl transition flex items-center gap-2 text-[10px] sm:text-xs"
         >
-          {libsLoaded ? (
-            <>
-              <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-              PDF Yuklab Olish
-            </>
-          ) : (
-            <>
-              <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-              Kutubxonalar yuklanmoqda...
-            </>
-          )}
+          <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+          PDF Yuklab Olish
         </button>
       </div>
 
