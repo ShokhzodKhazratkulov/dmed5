@@ -1,7 +1,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { Certificate } from '../types';
-import { DMEDLogo, DMEDCross, UzbekistanEmblem } from '../constants';
+import { DMEDLogo, DMEDCross } from '../constants';
 import { uploadFile, isCloudEnabled } from '../services/storage';
 
 interface Props {
@@ -203,7 +203,6 @@ const CertificatePreview: React.FC<Props> = ({ certificate, onClose, onUpdate })
               {data.clinicName}
             </div>
             <div className="flex justify-center col-span-1">
-              <UzbekistanEmblem className="w-16 h-16" />
             </div>
             <div className="col-span-1"></div>
           </div>
