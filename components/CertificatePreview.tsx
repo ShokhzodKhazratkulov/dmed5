@@ -14,7 +14,19 @@ const CertificatePreview: React.FC<Props> = ({ certificate, onClose, onUpdate })
   const qrRef = useRef<HTMLDivElement>(null);
   const printRef = useRef<HTMLDivElement>(null);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [libsLoaded, setLibsLoaded] = useState(false);
   const { data, id, securityCode, pdfUrl } = certificate;
+
+  useEffect(() => {
+    const checkLibs = () => {
+      if ((window as any).jspdf && (window as any).html2canvas) {
+        setLibsLoaded(true);
+      } else {
+        setTimeout(checkLibs, 500);
+      }
+    };
+    checkLibs();
+  }, []);
 
   useEffect(() => {
     // 1. Generate QR Code
@@ -69,8 +81,21 @@ const CertificatePreview: React.FC<Props> = ({ certificate, onClose, onUpdate })
   };
 
   const generateMedicalCertificatePdf = async (): Promise<Blob | null> => {
-    if (!printRef.current) return null;
+    if (!printRef.current) {
+      console.error("Print reference not found");
+      return null;
+    }
+    
     try {
+      // 0. Check if libraries are available
+      const jspdfLib = (window as any).jspdf;
+      const html2canvasLib = (window as any).html2canvas;
+
+      if (!jspdfLib || !html2canvasLib) {
+        console.error("PDF libraries (jsPDF or html2canvas) not loaded yet");
+        return null;
+      }
+
       // 1. Ensure all images are loaded before capturing
       const images = printRef.current.querySelectorAll('img');
       const imagePromises = Array.from(images).map((img: HTMLImageElement) => {
@@ -85,10 +110,15 @@ const CertificatePreview: React.FC<Props> = ({ certificate, onClose, onUpdate })
       // 2. Wait a moment for any final rendering (like QR code)
       await new Promise(resolve => setTimeout(resolve, 500));
 
-      // @ts-ignore
-      const { jsPDF } = window.jspdf;
-      // @ts-ignore
-      const canvas = await html2canvas(printRef.current, {
+      const { jsPDF } = jspdfLib;
+      const jsPDFConstructor = jsPDF || jspdfLib;
+      
+      if (typeof jsPDFConstructor !== 'function') {
+        console.error("jsPDF constructor not found in jspdfLib", jspdfLib);
+        return null;
+      }
+
+      const canvas = await html2canvasLib(printRef.current, {
         scale: 2,
         useCORS: true,
         logging: false,
@@ -104,12 +134,19 @@ const CertificatePreview: React.FC<Props> = ({ certificate, onClose, onUpdate })
             el.style.position = 'relative';
             el.style.top = '0';
             el.style.left = '0';
+            el.style.visibility = 'visible';
+            el.style.boxShadow = 'none';
           }
         }
       });
       
+      if (!canvas) {
+        console.error("html2canvas failed to create canvas");
+        return null;
+      }
+      
       const imgData = canvas.toDataURL('image/jpeg', 0.9);
-      const pdf = new jsPDF({
+      const pdf = new jsPDFConstructor({
         orientation: 'portrait',
         unit: 'mm',
         format: 'a4',
@@ -158,7 +195,14 @@ const CertificatePreview: React.FC<Props> = ({ certificate, onClose, onUpdate })
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
       } else {
-        alert("PDF yaratishda xatolik yuz berdi. Iltimos qaytadan urinib ko'ring.");
+        const jspdfLib = (window as any).jspdf;
+        const html2canvasLib = (window as any).html2canvas;
+        
+        if (!jspdfLib || !html2canvasLib) {
+          alert("Kutubxonalar hali yuklanmagan. Iltimos, bir oz kutib qaytadan urinib ko'ring.");
+        } else {
+          alert("PDF yaratishda xatolik yuz berdi. Iltimos qaytadan urinib ko'ring.");
+        }
       }
     } catch (err) {
       console.error("Download error:", err);
@@ -181,10 +225,20 @@ const CertificatePreview: React.FC<Props> = ({ certificate, onClose, onUpdate })
       <div className="flex flex-wrap justify-center gap-2 sm:gap-4 mb-8 sticky top-4 z-50 px-4">
         <button 
           onClick={handleDownload}
-          className="bg-[#0035AD] text-white px-4 sm:px-8 py-2.5 sm:py-3 rounded-full font-black uppercase tracking-widest shadow-2xl hover:bg-blue-800 transition flex items-center gap-2 text-[10px] sm:text-xs"
+          disabled={!libsLoaded}
+          className={`${!libsLoaded ? 'bg-slate-400 cursor-not-allowed' : 'bg-[#0035AD] hover:bg-blue-800'} text-white px-4 sm:px-8 py-2.5 sm:py-3 rounded-full font-black uppercase tracking-widest shadow-2xl transition flex items-center gap-2 text-[10px] sm:text-xs`}
         >
-          <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-          PDF Yuklab Olish
+          {libsLoaded ? (
+            <>
+              <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+              PDF Yuklab Olish
+            </>
+          ) : (
+            <>
+              <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              Kutubxonalar yuklanmoqda...
+            </>
+          )}
         </button>
       </div>
 
