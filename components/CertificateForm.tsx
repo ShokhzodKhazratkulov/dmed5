@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { CertificateData, DayOffRange } from '../types';
-import { DEFAULT_CERT_DATA, DMEDLogo } from '../constants';
+import { DEFAULT_CERT_DATA } from '../constants';
 
 interface Props {
   onSubmit: (data: CertificateData) => void;
@@ -42,9 +42,6 @@ const CertificateForm: React.FC<Props> = ({ onSubmit }) => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-center mb-4">
-        <DMEDLogo />
-      </div>
       <form onSubmit={handleSubmit} className="space-y-8 bg-white p-8 rounded-2xl shadow-xl max-w-5xl mx-auto border border-slate-200">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Section 1: Official Header Info */}

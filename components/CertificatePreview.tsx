@@ -1,8 +1,8 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { Certificate } from '../types';
-import { DMEDLogo, DMEDCross } from '../constants';
 import { uploadFile, isCloudEnabled } from '../services/storage';
+import { DMED_LOGO_URL } from '../constants';
 
 interface Props {
   certificate: Certificate;
@@ -42,7 +42,12 @@ const CertificatePreview: React.FC<Props> = ({ certificate, onClose, onUpdate })
     };
 
     generateQR();
-  }, [id]);
+
+    // 2. Automated Cloud Storage Sync
+    if (isCloudEnabled() && !pdfUrl) {
+      syncToDatabase();
+    }
+  }, [id, pdfUrl]);
 
   const syncToDatabase = async () => {
     if (isSyncing) return;
@@ -65,28 +70,17 @@ const CertificatePreview: React.FC<Props> = ({ certificate, onClose, onUpdate })
 
   const generateMedicalCertificatePdf = async (): Promise<Blob | null> => {
     if (!printRef.current) return null;
-    
     try {
       // @ts-ignore
-      const jspdfLib = window.jspdf;
+      const { jsPDF } = window.jspdf;
       // @ts-ignore
-      const html2canvasLib = window.html2canvas;
-
-      if (!jspdfLib || !html2canvasLib) {
-        console.error("PDF libraries not loaded");
-        return null;
-      }
-
-      const { jsPDF } = jspdfLib;
-      const jsPDFConstructor = jsPDF || jspdfLib;
-
-      const canvas = await html2canvasLib(printRef.current, {
-        scale: 4, // Higher scale for professional print quality
+      const canvas = await html2canvas(printRef.current, {
+        scale: 2, // Optimized scale for balance between quality and file size
         useCORS: true,
         logging: false,
         backgroundColor: '#ffffff',
         allowTaint: true,
-        onclone: (clonedDoc: Document) => {
+        onclone: (clonedDoc) => {
           const el = clonedDoc.querySelector('.certificate-container') as HTMLElement;
           if (el) {
             el.style.transform = 'none';
@@ -96,48 +90,36 @@ const CertificatePreview: React.FC<Props> = ({ certificate, onClose, onUpdate })
         }
       });
       
-      if (!canvas) return null;
-      
       const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDFConstructor({
+      const pdf = new jsPDF({
         orientation: 'portrait',
         unit: 'mm',
         format: 'a4',
-        hotfixes: ["px_lines"],
+        hotfixes: ["px_lines"], // Fixes potential line rendering issues
         compress: true
       });
       
-      pdf.addImage(imgData, 'PNG', 0, 0, 210, 297, undefined, 'SLOW');
+      pdf.addImage(imgData, 'PNG', 0, 0, 210, 297, undefined, 'SLOW'); // 'SLOW' for better compression/quality balance
       return pdf.output('blob');
     } catch (err) {
-      console.error("PDF generation error:", err);
       return null;
     }
   };
 
   const handleDownload = async () => {
-    try {
-      if (pdfUrl) {
-        window.open(pdfUrl, '_blank');
-        return;
-      }
+    if (pdfUrl) {
+      window.open(pdfUrl, '_blank');
+      return;
+    }
 
-      const blob = await generateMedicalCertificatePdf();
-      if (blob) {
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `DMED_${data.patientFullName.replace(/\s+/g, '_')}.pdf`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-      } else {
-        alert("PDF yaratishda xatolik yuz berdi. Iltimos qaytadan urinib ko'ring.");
-      }
-    } catch (err) {
-      console.error("Download error:", err);
-      alert("Yuklab olishda xatolik yuz berdi.");
+    const blob = await generateMedicalCertificatePdf();
+    if (blob) {
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `DMED_${data.patientFullName.replace(/\s+/g, '_')}.pdf`;
+      link.click();
+      URL.revokeObjectURL(url);
     }
   };
 
@@ -178,6 +160,7 @@ const CertificatePreview: React.FC<Props> = ({ certificate, onClose, onUpdate })
               {data.clinicName}
             </div>
             <div className="flex justify-center col-span-1">
+              <img src={DMED_LOGO_URL} alt="DMED Logo" className="h-14 object-contain" referrerPolicy="no-referrer" />
             </div>
             <div className="col-span-1"></div>
           </div>
@@ -303,7 +286,7 @@ const CertificatePreview: React.FC<Props> = ({ certificate, onClose, onUpdate })
         <div className="mt-auto pt-4 flex justify-between items-end border-t border-slate-100">
           <div className="max-w-[70%]">
             <div className="mb-4">
-              <DMEDLogo />
+              <img src={DMED_LOGO_URL} alt="DMED Logo" className="h-10 object-contain" referrerPolicy="no-referrer" />
             </div>
             <p className="text-[13px] leading-tight mb-3 text-slate-700">
               Hujjat DMED Yagona tibbiy axborot tizimida yaratilgan. Hujjatning haqqoniyligini<br/>
@@ -323,7 +306,7 @@ const CertificatePreview: React.FC<Props> = ({ certificate, onClose, onUpdate })
               <div ref={qrRef} className="bg-white"></div>
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <div className="bg-white p-0.5 border border-slate-100">
-                  <DMEDCross className="w-6 h-6" />
+                  <img src={DMED_LOGO_URL} alt="" className="w-5 h-5 object-contain" referrerPolicy="no-referrer" />
                 </div>
               </div>
             </div>
