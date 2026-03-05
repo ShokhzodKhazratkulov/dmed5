@@ -108,7 +108,7 @@ const CertificatePreview: React.FC<Props> = ({ certificate, onClose, onUpdate })
       await Promise.all(imagePromises);
 
       // 2. Wait a moment for any final rendering (like QR code)
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 300));
 
       const { jsPDF } = jspdfLib;
       const jsPDFConstructor = jsPDF || jspdfLib;
@@ -119,7 +119,7 @@ const CertificatePreview: React.FC<Props> = ({ certificate, onClose, onUpdate })
       }
 
       const canvas = await html2canvasLib(printRef.current, {
-        scale: 2,
+        scale: 2, // Keep high resolution for pixel-perfection
         useCORS: true,
         logging: false,
         backgroundColor: '#ffffff',
@@ -145,7 +145,6 @@ const CertificatePreview: React.FC<Props> = ({ certificate, onClose, onUpdate })
         return null;
       }
       
-      const imgData = canvas.toDataURL('image/jpeg', 0.9);
       const pdf = new jsPDFConstructor({
         orientation: 'portrait',
         unit: 'mm',
@@ -153,7 +152,10 @@ const CertificatePreview: React.FC<Props> = ({ certificate, onClose, onUpdate })
         compress: true
       });
       
-      pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
+      // Use 0.75 quality for JPEG to significantly reduce file size while maintaining legibility
+      const imgData = canvas.toDataURL('image/jpeg', 0.75);
+      pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
+      
       return pdf.output('blob');
     } catch (err) {
       console.error("PDF generation error:", err);
