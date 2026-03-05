@@ -64,67 +64,50 @@ const CertificatePreview: React.FC<Props> = ({ certificate, onClose, onUpdate })
   };
 
   const generateMedicalCertificatePdf = async (): Promise<Blob | null> => {
-    if (!printRef.current) {
-      console.error("Print reference not found");
-      return null;
-    }
+    if (!printRef.current) return null;
     
     try {
-      // Check if libraries are available
-      const jspdfLib = (window as any).jspdf;
-      const html2canvasLib = (window as any).html2canvas;
+      // @ts-ignore
+      const jspdfLib = window.jspdf;
+      // @ts-ignore
+      const html2canvasLib = window.html2canvas;
 
       if (!jspdfLib || !html2canvasLib) {
-        console.error("PDF libraries (jsPDF or html2canvas) not loaded yet");
+        console.error("PDF libraries not loaded");
         return null;
       }
 
       const { jsPDF } = jspdfLib;
       const jsPDFConstructor = jsPDF || jspdfLib;
-      
-      if (typeof jsPDFConstructor !== 'function') {
-        console.error("jsPDF constructor not found in jspdfLib", jspdfLib);
-        return null;
-      }
 
       const canvas = await html2canvasLib(printRef.current, {
-        scale: 2, // Keep high resolution for pixel-perfection
+        scale: 4, // Higher scale for professional print quality
         useCORS: true,
         logging: false,
         backgroundColor: '#ffffff',
-        allowTaint: false,
-        imageTimeout: 15000,
+        allowTaint: true,
         onclone: (clonedDoc: Document) => {
           const el = clonedDoc.querySelector('.certificate-container') as HTMLElement;
           if (el) {
             el.style.transform = 'none';
             el.style.margin = '0';
             el.style.display = 'flex';
-            el.style.position = 'relative';
-            el.style.top = '0';
-            el.style.left = '0';
-            el.style.visibility = 'visible';
-            el.style.boxShadow = 'none';
           }
         }
       });
       
-      if (!canvas) {
-        console.error("html2canvas failed to create canvas");
-        return null;
-      }
+      if (!canvas) return null;
       
+      const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDFConstructor({
         orientation: 'portrait',
         unit: 'mm',
         format: 'a4',
+        hotfixes: ["px_lines"],
         compress: true
       });
       
-      // Use 0.75 quality for JPEG to significantly reduce file size while maintaining legibility
-      const imgData = canvas.toDataURL('image/jpeg', 0.75);
-      pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
-      
+      pdf.addImage(imgData, 'PNG', 0, 0, 210, 297, undefined, 'SLOW');
       return pdf.output('blob');
     } catch (err) {
       console.error("PDF generation error:", err);
@@ -134,28 +117,12 @@ const CertificatePreview: React.FC<Props> = ({ certificate, onClose, onUpdate })
 
   const handleDownload = async () => {
     try {
-      let blob: Blob | null = null;
-
       if (pdfUrl) {
-        try {
-          // If we have a stored PDF URL, try to fetch it as a blob
-          const response = await fetch(pdfUrl);
-          if (response.ok) {
-            blob = await response.blob();
-          } else {
-            console.warn("Remote PDF fetch failed, falling back to local generation");
-          }
-        } catch (fetchErr) {
-          console.error("Fetch error:", fetchErr);
-          // Fallback to local generation if fetch fails (e.g. CORS)
-        }
+        window.open(pdfUrl, '_blank');
+        return;
       }
 
-      // If fetch failed or no pdfUrl, generate locally
-      if (!blob) {
-        blob = await generateMedicalCertificatePdf();
-      }
-
+      const blob = await generateMedicalCertificatePdf();
       if (blob) {
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
@@ -166,14 +133,7 @@ const CertificatePreview: React.FC<Props> = ({ certificate, onClose, onUpdate })
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
       } else {
-        const jspdfLib = (window as any).jspdf;
-        const html2canvasLib = (window as any).html2canvas;
-        
-        if (!jspdfLib || !html2canvasLib) {
-          alert("Kutubxonalar hali yuklanmagan. Iltimos, bir oz kutib qaytadan urinib ko'ring.");
-        } else {
-          alert("PDF yaratishda xatolik yuz berdi. Iltimos qaytadan urinib ko'ring.");
-        }
+        alert("PDF yaratishda xatolik yuz berdi. Iltimos qaytadan urinib ko'ring.");
       }
     } catch (err) {
       console.error("Download error:", err);
